@@ -105,4 +105,900 @@
       <div id="tagFilterBar" class="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
         <!-- 動態產生標籤篩選 -->
       </div>
-    </
+    </section>
+
+    <!-- 故事時間軸卡片網格 -->
+    <section id="storiesGrid" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- 動態產生故事卡片 -->
+    </section>
+
+  </main>
+
+  <!-- 新增 / 編輯故事 Modal -->
+  <div id="storyModal" class="fixed inset-0 z-50 hidden bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-[#FFFDF9] border border-[#E6DCD0] rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl space-y-5">
+      <div class="flex items-center justify-between border-b border-[#EFE6DA] pb-3">
+        <h3 id="modalTitle" class="text-lg font-bold text-[#4A3525]">新增故事片段</h3>
+        <button onclick="closeModal()" class="text-[#8C6D53] hover:text-[#3D2E24] text-xl leading-none">&times;</button>
+      </div>
+
+      <!-- 照片上傳與 EXIF 自動讀取區塊 -->
+      <div class="bg-[#F8F2EA] border border-dashed border-[#D2BFA9] rounded-xl p-4 space-y-3">
+        <div class="flex items-center justify-between">
+          <label class="text-sm font-medium text-[#5C4433] flex items-center gap-1.5">
+            <span>📸</span> 記憶照片（自動讀取拍攝日期與 GPS 地點）
+          </label>
+          <button type="button" id="removePhotoBtn" onclick="clearPhoto()" class="hidden text-xs text-red-600 hover:underline">移除照片</button>
+        </div>
+
+        <div id="photoUploadArea" onclick="document.getElementById('photoInput').click()"
+          class="cursor-pointer py-4 px-3 rounded-lg bg-white/70 hover:bg-white border border-[#E5D7C6] text-center transition">
+          <p class="text-xs text-[#7D6654]">點擊選擇照片（支援 JPG / PNG / WebP，會自動壓縮並解析 EXIF）</p>
+          <input id="photoInput" type="file" accept="image/*" onchange="handlePhotoUpload(event)" class="hidden" />
+        </div>
+
+        <div id="photoPreviewWrap" class="hidden space-y-2">
+          <img id="photoPreviewImg" src="" alt="預覽照片" class="max-h-52 mx-auto rounded-lg shadow-sm object-contain bg-white p-1.5 border border-[#E5D7C6]" />
+          <p id="exifStatusMsg" class="text-xs text-center text-[#8C5E3C]"></p>
+        </div>
+      </div>
+
+      <!-- 基本日期與地點 -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div>
+          <label class="block text-xs font-medium text-[#6E5643] mb-1">日期</label>
+          <input id="fieldDate" type="date" class="w-full px-3 py-2 text-sm rounded-lg border border-[#DFD3C3] bg-white" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-[#6E5643] mb-1">地點</label>
+          <input id="fieldLocation" type="text" placeholder="例如：台南 / 線上聊天" class="w-full px-3 py-2 text-sm rounded-lg border border-[#DFD3C3] bg-white" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-[#6E5643] mb-1">互動氛圍 (Mood)</label>
+          <input id="fieldMood" type="text" placeholder="例如：溫暖、搞笑" class="w-full px-3 py-2 text-sm rounded-lg border border-[#DFD3C3] bg-white" />
+        </div>
+      </div>
+
+      <!-- 原始紀錄輸入 + AI 自動解析按鈕 (僅在新增模式特別醒目) -->
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <label class="block text-xs font-medium text-[#6E5643]">互動片段 / 對話紀錄原文</label>
+          <button type="button" onclick="fillSampleInput()" class="text-xs text-[#C85A32] hover:underline">填入測試範例文字</button>
+        </div>
+        <textarea id="fieldRawInput" rows="3" placeholder="貼上你們的聊天片段、今天發生的小事，或她教你的印尼文..."
+          class="w-full px-3 py-2 text-sm rounded-lg border border-[#DFD3C3] bg-white focus:outline-none focus:border-[#C85A32]"></textarea>
+
+        <!-- AI 解析控制列 -->
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+          <details class="text-xs text-[#7D6654]">
+            <summary class="cursor-pointer hover:text-[#4A3525]">⚙️ 設定 Gemini API Key（選填，留空則用內建智慧模擬）</summary>
+            <div class="mt-2 flex items-center gap-2">
+              <input id="geminiApiKeyInput" type="password" placeholder="貼上 AIzaSy... 金鑰（僅存於本機瀏覽器）"
+                onchange="saveApiKey(this.value)"
+                class="px-2.5 py-1.5 rounded border border-[#DFD3C3] bg-white text-xs w-64" />
+            </div>
+          </details>
+          <button type="button" id="aiAnalyzeBtn" onclick="runAIAnalysis()"
+            class="px-3.5 py-1.5 text-xs font-medium rounded-lg bg-[#4A3525] hover:bg-[#332419] text-white transition flex items-center gap-1.5">
+            <span>🪄</span> AI 自動生成標題與印尼文筆記
+          </button>
+        </div>
+      </div>
+
+      <!-- 故事標題與摘要（可手動微調） -->
+      <div class="grid grid-cols-1 gap-3 pt-2 border-t border-[#EFE6DA]">
+        <div>
+          <label class="block text-xs font-medium text-[#6E5643] mb-1">故事標題</label>
+          <input id="fieldTitle" type="text" placeholder="有畫面感的一句短標" class="w-full px-3 py-2 text-sm rounded-lg border border-[#DFD3C3] bg-white" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-[#6E5643] mb-1">故事摘要</label>
+          <textarea id="fieldSummary" rows="2" placeholder="簡短整理這段互動的重點" class="w-full px-3 py-2 text-sm rounded-lg border border-[#DFD3C3] bg-white"></textarea>
+        </div>
+      </div>
+
+      <!-- 印尼文詞彙筆記編輯器 -->
+      <div class="space-y-2 pt-2 border-t border-[#EFE6DA]">
+        <div class="flex items-center justify-between">
+          <label class="text-xs font-bold text-[#4A3525]">🇮🇩 印尼文語氣與單字筆記</label>
+          <button type="button" onclick="addNoteRow()" class="text-xs px-2.5 py-1 rounded bg-[#F3ECE2] hover:bg-[#E6DACB] text-[#5C4433]">＋ 新增單字</button>
+        </div>
+        <div id="notesEditorList" class="space-y-2">
+          <!-- 動態產生單字編輯列 -->
+        </div>
+      </div>
+
+      <!-- 文化彩蛋與標籤 -->
+      <div class="grid grid-cols-1 gap-3 pt-2 border-t border-[#EFE6DA]">
+        <div>
+          <label class="block text-xs font-medium text-[#6E5643] mb-1">🌏 印尼文化 / 生活彩蛋</label>
+          <textarea id="fieldTrivia" rows="2" placeholder="補充相關的印尼飲食、習慣或文化脈絡" class="w-full px-3 py-2 text-sm rounded-lg border border-[#DFD3C3] bg-white"></textarea>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-[#6E5643] mb-1">✨ 提取她的小默契（格式：分類:細節，多筆用逗號隔開）</label>
+            <input id="fieldPrefs" type="text" placeholder="例如：飲食:喜歡吃辣, 飲料:愛喝無糖綠" class="w-full px-3 py-2 text-sm rounded-lg border border-[#DFD3C3] bg-white" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-[#6E5643] mb-1">🏷️ 標籤（用逗號分隔）</label>
+            <input id="fieldTags" type="text" placeholder="例如：#美食, #日常聊天" class="w-full px-3 py-2 text-sm rounded-lg border border-[#DFD3C3] bg-white" />
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部操作按鈕 -->
+      <div class="flex items-center justify-between pt-4 border-t border-[#EFE6DA]">
+        <button type="button" id="deleteStoryBtn" onclick="deleteCurrentStory()" class="hidden px-3 py-2 text-xs rounded-lg text-red-600 hover:bg-red-50 transition">
+          🗑️ 刪除此篇故事
+        </button>
+        <div class="flex items-center gap-2 ml-auto">
+          <button type="button" onclick="closeModal()" class="px-4 py-2 text-sm rounded-xl border border-[#D4C3B0] text-[#5C4433] hover:bg-[#F3ECE2]">取消</button>
+          <button type="button" onclick="saveStory()" class="px-5 py-2 text-sm font-medium rounded-xl bg-[#C85A32] hover:bg-[#B04B26] text-white shadow-sm">儲存故事</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'cerita_kita_stories_v2';
+    const API_KEY_STORAGE = 'cerita_kita_gemini_key';
+
+    // 預設兩則範例故事
+    const DEFAULT_STORIES = [
+      {
+        story_id: '20261120_001',
+        date: '2026-11-20',
+        location: '台南 · 線上宵夜聊天',
+        mood: '有趣、親切',
+        raw_input: "今天聊到印尼泡麵 Indomie，她說一定要加半熟蛋跟超辣辣椒醬才算靈魂吃法，還教我說 'Pedas banget!'",
+        media_url: '',
+        ai_generated: {
+          title: 'Indomie 的靈魂吃法與第一句超辣宣言',
+          narrative_summary: '從宵夜話題聊開，她認真傳授了道地印尼乾拌麵的黃金比例，還現學現賣教了一句實用形容詞。',
+          indonesian_notes: [
+            {
+              phrase: 'Pedas banget!',
+              literal: '辣 + 非常',
+              nuance: "口語常用強調語氣，比教科書的 'Sangat pedas' 更自然道地。",
+              pronunciation_hint: 'ㄆㄜ-達斯 邦-厄'
+            }
+          ],
+          cultural_trivia: '印尼人吃 Indomie Mi Goreng（經典炒麵）時，路邊攤（Warkop）常會搭配半熟蛋與大量鳥眼椒（Cabai Rawit）。',
+          extracted_preferences: [
+            { category: '飲食', detail: '喜歡吃辣、Indomie 必加半熟蛋' }
+          ],
+          tags: ['#美食', '#印尼語學習', '#日常聊天']
+        }
+      },
+      {
+        story_id: '20261125_002',
+        date: '2026-11-25',
+        location: '台南中西區',
+        mood: '溫暖、放鬆',
+        raw_input: "下班後一起去喝咖啡，她笑說台灣的手搖飲全糖太甜了，下次要點 'Jangan terlalu manis'（不要太甜），還說很喜歡台南晚上的微風。",
+        media_url: '',
+        ai_generated: {
+          title: '微風與「不要太甜」的飲料點單暗號',
+          narrative_summary: '散步聊起台灣與印尼飲料甜度的差異，順便學會了點飲料最實用的客製化印尼文句子。',
+          indonesian_notes: [
+            {
+              phrase: 'Jangan terlalu manis',
+              literal: '不要 + 太 + 甜',
+              nuance: '點飲料或餐點時超實用，語氣自然委婉。',
+              pronunciation_hint: '姜-安 特-拉-盧 瑪-尼斯'
+            }
+          ],
+          cultural_trivia: '印尼當地茶飲（如 Es Teh Manis）傳統上其實偏甜，但年輕族群近年在手搖飲店也越來越常點少糖（Kurang gula）。',
+          extracted_preferences: [
+            { category: '飲料', detail: '不喜歡太甜的飲料' },
+            { category: '氛圍', detail: '喜歡晚上散步吹微風' }
+          ],
+          tags: ['#見面散步', '#飲食習慣', '#實用短句']
+        }
+      }
+    ];
+
+    let stories = [];
+    let selectedTag = 'ALL';
+    let editingStoryId = null;
+    let currentPhotoBase64 = '';
+
+    // 初始化
+    function init() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          stories = JSON.parse(saved);
+        } catch (e) {
+          stories = [...DEFAULT_STORIES];
+        }
+      } else {
+        stories = [...DEFAULT_STORIES];
+        persistStories();
+      }
+      const savedKey = localStorage.getItem(API_KEY_STORAGE);
+      if (savedKey) {
+        document.getElementById('geminiApiKeyInput').value = savedKey;
+      }
+      renderAll();
+    }
+
+    function persistStories() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(stories));
+      } catch (e) {
+        alert('瀏覽器儲存空間已滿（可能是照片過多），建議先按右上角「匯出 JSON」備份！');
+      }
+    }
+
+    function saveApiKey(val) {
+      localStorage.setItem(API_KEY_STORAGE, val.trim());
+    }
+
+    function renderAll() {
+      renderPreferences();
+      renderTagFilters();
+      renderStories();
+    }
+
+    // 渲染她的小默契雷達
+    function renderPreferences() {
+      const container = document.getElementById('preferencesList');
+      const allPrefs = [];
+      stories.forEach(s => {
+        (s.ai_generated?.extracted_preferences || []).forEach(p => {
+          allPrefs.push(p);
+        });
+      });
+      document.getElementById('prefCount').textContent = `${allPrefs.length} 項線索`;
+      if (allPrefs.length === 0) {
+        container.innerHTML = `<span class="text-xs text-[#9E8875]">尚未累積默契線索，新增故事時可記錄她的喜好喔！</span>`;
+        return;
+      }
+      container.innerHTML = allPrefs.map(p => `
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-[#FDF6EC] border border-[#E8D5BE] text-[#5C4433]">
+          <strong class="text-[#C85A32]">${escapeHtml(p.category)}</strong>
+          <span>${escapeHtml(p.detail)}</span>
+        </span>
+      `).join('');
+    }
+
+    // 渲染標籤篩選列
+    function renderTagFilters() {
+      const bar = document.getElementById('tagFilterBar');
+      const tagSet = new Set(['ALL']);
+      stories.forEach(s => (s.ai_generated?.tags || []).forEach(t => tagSet.add(t)));
+      bar.innerHTML = Array.from(tagSet).map(tag => {
+        const active = selectedTag === tag;
+        const label = tag === 'ALL' ? '全部故事' : tag;
+        return `
+          <button onclick="setTagFilter('${escapeHtml(tag)}')"
+            class="px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition ${active ? 'bg-[#4A3525] text-white font-medium' : 'bg-white border border-[#DFD3C3] text-[#6E5643] hover:bg-[#F3ECE2]'}">
+            ${escapeHtml(label)}
+          </button>
+        `;
+      }).join('');
+    }
+
+    function setTagFilter(tag) {
+      selectedTag = tag;
+      renderAll();
+    }
+
+    // 渲染故事時間軸卡片
+    function renderStories() {
+      const grid = document.getElementById('storiesGrid');
+      const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
+
+      const filtered = stories.filter(s => {
+        const ai = s.ai_generated || {};
+        const matchTag = selectedTag === 'ALL' || (ai.tags || []).includes(selectedTag);
+        if (!matchTag) return false;
+        if (!keyword) return true;
+        const haystack = [
+          s.date, s.location, s.mood, s.raw_input,
+          ai.title, ai.narrative_summary, ai.cultural_trivia,
+          ...(ai.tags || []),
+          ...(ai.indonesian_notes || []).map(n => `${n.phrase} ${n.nuance}`)
+        ].join(' ').toLowerCase();
+        return haystack.includes(keyword);
+      });
+
+      if (filtered.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-full text-center py-12 bg-white/60 rounded-2xl border border-dashed border-[#D6C7B7]">
+            <p class="text-sm text-[#7D6654]">找不到符合條件的故事片段，試試切換標籤或新增一則故事吧！</p>
+          </div>
+        `;
+        return;
+      }
+
+      grid.innerHTML = filtered.map(story => {
+        const ai = story.ai_generated || {};
+        const notes = ai.indonesian_notes || [];
+        const tags = ai.tags || [];
+        const hasPhoto = Boolean(story.media_url);
+
+        return `
+          <article id="card-${story.story_id}" class="flip-card perspective-1000">
+            <div class="flip-card-inner">
+              <!-- 正面：故事與拍立得照片 -->
+              <div class="flip-card-front bg-white rounded-2xl border border-[#E6DCD0] p-5 shadow-sm flex flex-col justify-between min-h-[340px]">
+                <div>
+                  <!-- 頂部日期與操作列 -->
+                  <div class="flex items-center justify-between gap-2 text-xs text-[#8C6D53] mb-3">
+                    <div class="flex flex-wrap items-center gap-1.5">
+                      <span class="font-semibold text-[#C85A32]">📅 ${escapeHtml(story.date)}</span>
+                      <span>·</span>
+                      <span>📍 ${escapeHtml(story.location || '未標註地點')}</span>
+                    </div>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                      <button onclick="openEditModal('${story.story_id}')" title="編輯此篇故事"
+                        class="px-2.5 py-1 rounded-lg bg-[#F5EBE0] hover:bg-[#EADBC8] text-[#5C4433] transition">
+                        ✏️ 編輯
+                      </button>
+                      <button onclick="toggleFlip('${story.story_id}')" title="翻面看印尼文筆記"
+                        class="px-2.5 py-1 rounded-lg bg-[#4A3525] hover:bg-[#332419] text-white transition">
+                        印尼文筆記 ↻
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- 拍立得照片區（若有上傳） -->
+                  ${hasPhoto ? `
+                    <div class="mb-3 bg-[#FAF6F0] p-2 rounded-xl border border-[#EAE0D3]">
+                      <img src="${story.media_url}" alt="${escapeHtml(ai.title || '故事照片')}"
+                        class="w-full h-48 object-cover rounded-lg" />
+                    </div>
+                  ` : ''}
+
+                  <!-- 標題與摘要 -->
+                  <h3 class="font-serif-title text-lg font-bold text-[#3D2E24] leading-snug mb-2">
+                    ${escapeHtml(ai.title || '未命名故事')}
+                  </h3>
+                  <p class="text-sm text-[#5C4433] leading-relaxed mb-3">
+                    ${escapeHtml(ai.narrative_summary || story.raw_input)}
+                  </p>
+
+                  <!-- 原文引述 -->
+                  <blockquote class="text-xs text-[#7D6654] bg-[#FAF6F0] border-l-2 border-[#C85A32] pl-3 py-2 pr-2 rounded-r-lg italic mb-4">
+                    「${escapeHtml(story.raw_input)}」
+                  </blockquote>
+                </div>
+
+                <!-- 底部標籤與氛圍 -->
+                <div class="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-[#F0E7DC]">
+                  <div class="flex flex-wrap gap-1.5">
+                    ${tags.map(t => `<span class="text-[11px] px-2 py-0.5 rounded-md bg-[#F5EBE0] text-[#7D5A3C]">${escapeHtml(t)}</span>`).join('')}
+                  </div>
+                  ${story.mood ? `<span class="text-[11px] text-[#8C6D53]">氛圍：${escapeHtml(story.mood)}</span>` : ''}
+                </div>
+              </div>
+
+              <!-- 背面：印尼文筆記與文化彩蛋 -->
+              <div class="flip-card-back bg-[#3A291E] text-[#FAF6F0] rounded-2xl border border-[#523B2C] p-5 shadow-md flex flex-col justify-between">
+                <div class="space-y-4">
+                  <div class="flex items-center justify-between border-b border-[#523B2C] pb-2.5">
+                    <span class="text-xs font-bold tracking-wider uppercase text-[#E5B887]">🇮🇩 Bahasa Indonesia 筆記</span>
+                    <button onclick="toggleFlip('${story.story_id}')"
+                      class="px-2.5 py-1 text-xs rounded-lg bg-[#523B2C] hover:bg-[#664A38] text-[#FAF6F0] transition">
+                      返回故事 ↺
+                    </button>
+                  </div>
+
+                  <!-- 單字列表 -->
+                  <div class="space-y-2.5">
+                    ${notes.length > 0 ? notes.map(n => `
+                      <div class="bg-[#4A3525] rounded-xl p-3 border border-[#5E4431]">
+                        <div class="flex items-center justify-between gap-2 mb-1">
+                          <span class="font-bold text-base text-[#FFD4A3]">${escapeHtml(n.phrase)}</span>
+                          <button onclick="speakIndonesian('${escapeAttr(n.phrase)}')"
+                            class="px-2 py-0.5 text-[11px] rounded-full bg-[#C85A32] hover:bg-[#D96B43] text-white transition">
+                            🔊 聽發音
+                          </button>
+                        </div>
+                        <div class="text-xs text-[#D6C3B2] mb-1">
+                          直譯：${escapeHtml(n.literal || '-')} ｜ 諧音：<span class="text-[#F3D5B5]">${escapeHtml(n.pronunciation_hint || '-')}</span>
+                        </div>
+                        <p class="text-xs text-[#EFE5DA] leading-relaxed">${escapeHtml(n.nuance || '')}</p>
+                      </div>
+                    `).join('') : `<p class="text-xs text-[#C4B09E]">這則故事還沒有記錄印尼文單字，可點正面「編輯」補充。</p>`}
+                  </div>
+
+                  <!-- 文化彩蛋 -->
+                  ${ai.cultural_trivia ? `
+                    <div class="bg-[#2E2017] rounded-xl p-3 border border-[#4D3729]">
+                      <div class="text-xs font-bold text-[#E5B887] mb-1">🌏 印尼文化小彩蛋</div>
+                      <p class="text-xs text-[#E3D6C8] leading-relaxed">${escapeHtml(ai.cultural_trivia)}</p>
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+            </div>
+          </article>
+        `;
+      }).join('');
+    }
+
+    function toggleFlip(id) {
+      const card = document.getElementById(`card-${id}`);
+      if (card) card.classList.toggle('flipped');
+    }
+
+    // 印尼文語音朗讀
+    function speakIndonesian(text) {
+      if (!('speechSynthesis' in window)) {
+        alert('你的瀏覽器不支援語音朗讀功能');
+        return;
+      }
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = 'id-ID';
+      utter.rate = 0.9;
+      window.speechSynthesis.speak(utter);
+    }
+
+    // --- 照片上傳與 EXIF 自動解析 ---
+    async function handlePhotoUpload(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      const statusEl = document.getElementById('exifStatusMsg');
+      statusEl.textContent = '正在讀取照片 EXIF 拍攝時間與 GPS 座標...';
+      document.getElementById('photoPreviewWrap').classList.remove('hidden');
+      document.getElementById('removePhotoBtn').classList.remove('hidden');
+
+      // 1. 解析 EXIF 日期與 GPS
+      try {
+        if (window.exifr) {
+          const exif = await window.exifr.parse(file, ['DateTimeOriginal', 'CreateDate', 'latitude', 'longitude']);
+          let notes = [];
+          const dt = exif?.DateTimeOriginal || exif?.CreateDate;
+          if (dt instanceof Date && !isNaN(dt)) {
+            const yyyy = dt.getFullYear();
+            const mm = String(dt.getMonth() + 1).padStart(2, '0');
+            const dd = String(dt.getDate()).padStart(2, '0');
+            document.getElementById('fieldDate').value = `${yyyy}-${mm}-${dd}`;
+            notes.push(`已自動帶入拍攝日期 (${yyyy}-${mm}-${dd})`);
+          }
+          if (typeof exif?.latitude === 'number' && typeof exif?.longitude === 'number') {
+            notes.push('已讀取 GPS 座標，正在轉換地名...');
+            statusEl.textContent = notes.join(' · ');
+            const placeName = await reverseGeocode(exif.latitude, exif.longitude);
+            document.getElementById('fieldLocation').value = placeName;
+            notes[notes.length - 1] = `已自動帶入地點：${placeName}`;
+          }
+          statusEl.textContent = notes.length > 0
+            ? '✅ ' + notes.join(' ｜ ')
+            : 'ℹ️ 此照片未包含 EXIF 日期或 GPS 資訊，請手動確認日期與地點。';
+        }
+      } catch (err) {
+        statusEl.textContent = 'ℹ️ 無法讀取 EXIF 資訊，請手動填寫日期與地點。';
+      }
+
+      // 2. Canvas 壓縮圖片轉為 Base64，避免塞爆 localStorage
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+          const maxDim = 1200;
+          let w = img.width;
+          let h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          currentPhotoBase64 = canvas.toDataURL('image/jpeg', 0.8);
+          document.getElementById('photoPreviewImg').src = currentPhotoBase64;
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    async function reverseGeocode(lat, lon) {
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=zh-TW`);
+        if (!res.ok) throw new Error('Network error');
+        const data = await res.json();
+        const addr = data.address || {};
+        const city = addr.city || addr.county || addr.state || '';
+        const district = addr.suburb || addr.town || addr.district || '';
+        const spot = addr.amenity || addr.tourism || addr.road || '';
+        const combined = [city, district, spot].filter(Boolean).join(' ');
+        return combined || `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+      } catch (e) {
+        return `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+      }
+    }
+
+    function clearPhoto() {
+      currentPhotoBase64 = '';
+      document.getElementById('photoInput').value = '';
+      document.getElementById('photoPreviewImg').src = '';
+      document.getElementById('photoPreviewWrap').classList.add('hidden');
+      document.getElementById('removePhotoBtn').classList.add('hidden');
+      document.getElementById('exifStatusMsg').textContent = '';
+    }
+
+    // --- Modal 開啟（新增 / 編輯） ---
+    function openCreateModal() {
+      editingStoryId = null;
+      document.getElementById('modalTitle').textContent = '新增故事片段';
+      document.getElementById('deleteStoryBtn').classList.add('hidden');
+
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('fieldDate').value = today;
+      document.getElementById('fieldLocation').value = '';
+      document.getElementById('fieldMood').value = '';
+      document.getElementById('fieldRawInput').value = '';
+      document.getElementById('fieldTitle').value = '';
+      document.getElementById('fieldSummary').value = '';
+      document.getElementById('fieldTrivia').value = '';
+      document.getElementById('fieldPrefs').value = '';
+      document.getElementById('fieldTags').value = '';
+      clearPhoto();
+
+      renderNotesEditor([{ phrase: '', literal: '', pronunciation_hint: '', nuance: '' }]);
+      document.getElementById('storyModal').classList.remove('hidden');
+    }
+
+    function openEditModal(storyId) {
+      const story = stories.find(s => s.story_id === storyId);
+      if (!story) return;
+
+      editingStoryId = storyId;
+      document.getElementById('modalTitle').textContent = '編輯故事內容';
+      document.getElementById('deleteStoryBtn').classList.remove('hidden');
+
+      const ai = story.ai_generated || {};
+      document.getElementById('fieldDate').value = story.date || '';
+      document.getElementById('fieldLocation').value = story.location || '';
+      document.getElementById('fieldMood').value = story.mood || '';
+      document.getElementById('fieldRawInput').value = story.raw_input || '';
+      document.getElementById('fieldTitle').value = ai.title || '';
+      document.getElementById('fieldSummary').value = ai.narrative_summary || '';
+      document.getElementById('fieldTrivia').value = ai.cultural_trivia || '';
+
+      const prefsStr = (ai.extracted_preferences || [])
+        .map(p => `${p.category}:${p.detail}`)
+        .join(', ');
+      document.getElementById('fieldPrefs').value = prefsStr;
+      document.getElementById('fieldTags').value = (ai.tags || []).join(', ');
+
+      // 載入既有照片
+      if (story.media_url) {
+        currentPhotoBase64 = story.media_url;
+        document.getElementById('photoPreviewImg').src = currentPhotoBase64;
+        document.getElementById('photoPreviewWrap').classList.remove('hidden');
+        document.getElementById('removePhotoBtn').classList.remove('hidden');
+        document.getElementById('exifStatusMsg').textContent = '已載入此篇故事的照片（可重新選擇覆蓋或移除）';
+      } else {
+        clearPhoto();
+      }
+
+      const notes = (ai.indonesian_notes && ai.indonesian_notes.length > 0)
+        ? ai.indonesian_notes
+        : [{ phrase: '', literal: '', pronunciation_hint: '', nuance: '' }];
+      renderNotesEditor(notes);
+
+      document.getElementById('storyModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('storyModal').classList.add('hidden');
+    }
+
+    // 單字筆記動態編輯列
+    function renderNotesEditor(notes) {
+      const list = document.getElementById('notesEditorList');
+      list.innerHTML = notes.map((n, idx) => `
+        <div class="note-row bg-[#FAF6F0] p-3 rounded-xl border border-[#E5D7C6] space-y-2 relative">
+          <button type="button" onclick="this.parentElement.remove()" title="刪除此單字"
+            class="absolute top-2 right-2.5 text-xs text-[#9E8875] hover:text-red-600">✕</button>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pr-5">
+            <input type="text" data-field="phrase" value="${escapeAttr(n.phrase || '')}" placeholder="印尼文詞彙 (如: Santai aja)"
+              class="px-2.5 py-1.5 text-xs rounded border border-[#DFD3C3] bg-white font-medium" />
+            <input type="text" data-field="literal" value="${escapeAttr(n.literal || '')}" placeholder="字面直譯"
+              class="px-2.5 py-1.5 text-xs rounded border border-[#DFD3C3] bg-white" />
+            <input type="text" data-field="pronunciation_hint" value="${escapeAttr(n.pronunciation_hint || '')}" placeholder="中文諧音提示"
+              class="px-2.5 py-1.5 text-xs rounded border border-[#DFD3C3] bg-white" />
+          </div>
+          <input type="text" data-field="nuance" value="${escapeAttr(n.nuance || '')}" placeholder="語氣 nuances 與使用情境說明"
+            class="w-full px-2.5 py-1.5 text-xs rounded border border-[#DFD3C3] bg-white" />
+        </div>
+      `).join('');
+    }
+
+    function addNoteRow() {
+      const list = document.getElementById('notesEditorList');
+      const div = document.createElement('div');
+      div.className = 'note-row bg-[#FAF6F0] p-3 rounded-xl border border-[#E5D7C6] space-y-2 relative';
+      div.innerHTML = `
+        <button type="button" onclick="this.parentElement.remove()" title="刪除此單字"
+          class="absolute top-2 right-2.5 text-xs text-[#9E8875] hover:text-red-600">✕</button>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pr-5">
+          <input type="text" data-field="phrase" placeholder="印尼文詞彙"
+            class="px-2.5 py-1.5 text-xs rounded border border-[#DFD3C3] bg-white font-medium" />
+          <input type="text" data-field="literal" placeholder="字面直譯"
+            class="px-2.5 py-1.5 text-xs rounded border border-[#DFD3C3] bg-white" />
+          <input type="text" data-field="pronunciation_hint" placeholder="中文諧音提示"
+            class="px-2.5 py-1.5 text-xs rounded border border-[#DFD3C3] bg-white" />
+        </div>
+        <input type="text" data-field="nuance" placeholder="語氣 nuances 與使用情境說明"
+          class="w-full px-2.5 py-1.5 text-xs rounded border border-[#DFD3C3] bg-white" />
+      `;
+      list.appendChild(div);
+    }
+
+    function collectNotesFromEditor() {
+      const rows = document.querySelectorAll('#notesEditorList .note-row');
+      const result = [];
+      rows.forEach(row => {
+        const phrase = row.querySelector('[data-field="phrase"]').value.trim();
+        const literal = row.querySelector('[data-field="literal"]').value.trim();
+        const pronunciation_hint = row.querySelector('[data-field="pronunciation_hint"]').value.trim();
+        const nuance = row.querySelector('[data-field="nuance"]').value.trim();
+        if (phrase || nuance) {
+          result.push({ phrase, literal, pronunciation_hint, nuance });
+        }
+      });
+      return result;
+    }
+
+    // 填入測試範例
+    function fillSampleInput() {
+      document.getElementById('fieldRawInput').value =
+        "今天加班有點累，她傳訊息安慰我說 'Semangat ya! Jangan lupa makan'，叫我加油別忘了吃飯，還說週末可以一起去吃好吃的沙嗲！";
+      if (!document.getElementById('fieldLocation').value) {
+        document.getElementById('fieldLocation').value = '台南 · LINE 聊天';
+      }
+      document.getElementById('fieldMood').value = '暖心、被鼓勵';
+    }
+
+    // AI 自動解析（支援真實 Gemini API 或內建智慧模擬）
+    async function runAIAnalysis() {
+      const raw = document.getElementById('fieldRawInput').value.trim();
+      if (!raw) {
+        alert('請先輸入一點互動片段或對話文字喔！');
+        return;
+      }
+
+      const btn = document.getElementById('aiAnalyzeBtn');
+      const originalText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳</span> 解析中...';
+
+      const apiKey = document.getElementById('geminiApiKeyInput').value.trim();
+
+      try {
+        let parsed;
+        if (apiKey) {
+          parsed = await callGeminiAPI(apiKey, raw);
+        } else {
+          // 內建離線模擬解析
+          await new Promise(r => setTimeout(r, 500));
+          parsed = simulateAIAnalysis(raw);
+        }
+
+        document.getElementById('fieldTitle').value = parsed.title || '';
+        document.getElementById('fieldSummary').value = parsed.narrative_summary || '';
+        document.getElementById('fieldTrivia').value = parsed.cultural_trivia || '';
+        document.getElementById('fieldTags').value = (parsed.tags || []).join(', ');
+        document.getElementById('fieldPrefs').value = (parsed.extracted_preferences || [])
+          .map(p => `${p.category}:${p.detail}`)
+          .join(', ');
+        renderNotesEditor(parsed.indonesian_notes || []);
+      } catch (err) {
+        alert('AI 解析發生錯誤：' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      }
+    }
+
+    async function callGeminiAPI(apiKey, rawText) {
+      const prompt = `你是一位精通台灣文化與印尼年輕人日常口語的雙語故事編輯。請根據以下互動紀錄，輸出純 JSON（不要 markdown 標記），格式如下：
+{
+  "title": "有畫面感的一句短標題",
+  "narrative_summary": "溫暖精煉的兩句故事摘要",
+  "indonesian_notes": [
+    { "phrase": "印尼文詞彙", "literal": "字面直譯", "pronunciation_hint": "中文諧音", "nuance": "口語語氣與用法" }
+  ],
+  "cultural_trivia": "相關的印尼文化或生活小補充",
+  "extracted_preferences": [
+    { "category": "飲食/興趣/習慣", "detail": "具體喜好" }
+  ],
+  "tags": ["#標籤1", "#標籤2"]
+}
+互動紀錄：${rawText}`;
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: 'application/json' }
+        })
+      });
+      if (!res.ok) throw new Error('API 呼叫失敗，請確認金鑰是否正確');
+      const data = await res.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+      return JSON.parse(text);
+    }
+
+    function simulateAIAnalysis(raw) {
+      if (raw.includes('Semangat')) {
+        return {
+          title: '忙碌夜晚裡的一句「Semangat ya!」',
+          narrative_summary: '在加班疲憊的時候收到她的暖心提醒，用最道地的印尼式應援替彼此充電。',
+          indonesian_notes: [
+            {
+              phrase: 'Semangat ya!',
+              literal: '精神 / 熱情 + 語氣詞',
+              pronunciation_hint: '瑟-瑪-阿特 呀',
+              nuance: '印尼人最常用的「加油！」，加上 ya 語氣更溫柔親切。'
+            },
+            {
+              phrase: 'Jangan lupa makan',
+              literal: '不要 + 忘記 + 吃飯',
+              pronunciation_hint: '姜-安 盧-帕 瑪-坎',
+              nuance: '印尼文化裡表達關心最經典的問候語，比單純說保重更有溫度。'
+            }
+          ],
+          cultural_trivia: '在印尼日常對話中，「Sudah makan?（吃飯了嗎？）」與「Jangan lupa makan」就跟台灣人問「吃飽沒」一樣，是最道地的關心表現；沙嗲（Sate）則是國民街頭烤肉美食。',
+          extracted_preferences: [
+            { category: '美食', detail: '喜歡吃印尼沙嗲 (Sate)' }
+          ],
+          tags: ['#暖心應援', '#印尼語學習', '#美食約定']
+        };
+      }
+      return {
+        title: '屬於我們的日常新篇章',
+        narrative_summary: raw.slice(0, 60) + (raw.length > 60 ? '...' : ''),
+        indonesian_notes: [
+          {
+            phrase: 'Terima kasih banyak',
+            literal: '感謝 + 很多',
+            pronunciation_hint: '特-莉-瑪 卡-西 邦-亞',
+            nuance: '真誠表達「非常感謝」，日常或約會後傳訊息都很適合。'
+          }
+        ],
+        cultural_trivia: '印尼人在聊天時很習慣在句尾加上 lah、ya、dong 等語氣助詞，能讓整句話聽起來更柔和、拉近距離。',
+        extracted_preferences: [],
+        tags: ['#日常點滴', '#印尼文化']
+      };
+    }
+
+    // 儲存新增或編輯後的故事
+    function saveStory() {
+      const date = document.getElementById('fieldDate').value || new Date().toISOString().split('T')[0];
+      const location = document.getElementById('fieldLocation').value.trim();
+      const mood = document.getElementById('fieldMood').value.trim();
+      const raw_input = document.getElementById('fieldRawInput').value.trim();
+      const title = document.getElementById('fieldTitle').value.trim() || '日常互動記錄';
+      const narrative_summary = document.getElementById('fieldSummary').value.trim() || raw_input;
+      const cultural_trivia = document.getElementById('fieldTrivia').value.trim();
+
+      if (!raw_input && !title) {
+        alert('請至少填寫故事標題或互動紀錄內容！');
+        return;
+      }
+
+      const tags = document.getElementById('fieldTags').value
+        .split(/[,，]/)
+        .map(t => t.trim())
+        .filter(Boolean)
+        .map(t => t.startsWith('#') ? t : `#${t}`);
+
+      const extracted_preferences = document.getElementById('fieldPrefs').value
+        .split(/[,，]/)
+        .map(item => item.trim())
+        .filter(Boolean)
+        .map(item => {
+          const idx = item.indexOf(':') !== -1 ? item.indexOf(':') : item.indexOf('：');
+          if (idx !== -1) {
+            return { category: item.slice(0, idx).trim(), detail: item.slice(idx + 1).trim() };
+          }
+          return { category: '小默契', detail: item };
+        });
+
+      const indonesian_notes = collectNotesFromEditor();
+
+      const storyObj = {
+        story_id: editingStoryId || `story_${Date.now()}`,
+        date,
+        location,
+        mood,
+        raw_input,
+        media_url: currentPhotoBase64,
+        ai_generated: {
+          title,
+          narrative_summary,
+          indonesian_notes,
+          cultural_trivia,
+          extracted_preferences,
+          tags
+        }
+      };
+
+      if (editingStoryId) {
+        const idx = stories.findIndex(s => s.story_id === editingStoryId);
+        if (idx !== -1) stories[idx] = storyObj;
+      } else {
+        stories.unshift(storyObj);
+      }
+
+      // 依日期由新到舊排序
+      stories.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+      persistStories();
+      closeModal();
+      renderAll();
+    }
+
+    function deleteCurrentStory() {
+      if (!editingStoryId) return;
+      if (!confirm('確定要刪除這篇故事嗎？刪除後無法復原喔。')) return;
+      stories = stories.filter(s => s.story_id !== editingStoryId);
+      persistStories();
+      closeModal();
+      renderAll();
+    }
+
+    // 匯出與匯入 JSON 備份
+    function exportJSON() {
+      const blob = new Blob([JSON.stringify(stories, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `cerita_kita_backup_${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function importJSON(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const imported = JSON.parse(e.target.result);
+          if (!Array.isArray(imported)) throw new Error('格式不符');
+          stories = imported;
+          persistStories();
+          renderAll();
+          alert(`成功匯入 ${stories.length} 則故事！`);
+        } catch (err) {
+          alert('JSON 檔案格式不正確，請確認是否為本工具匯出的備份檔。');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function escapeAttr(str) {
+      return String(str || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    init();
+  </script>
+</body>
+</html>
